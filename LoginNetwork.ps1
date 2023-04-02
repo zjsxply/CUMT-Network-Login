@@ -302,6 +302,15 @@ do {
 		"电信" {
 			$Carrier = "telecom"
 		}
+		"telecom" {
+			$Carrier = "telecom"
+		}
+		"cmcc" {
+			$Carrier = "cmcc"
+		}
+		"unicom" {
+			$Carrier = "unicom"
+		}
 		default {
 			Write-Host "未知的运营商" -ForegroundColor Red
 		}
@@ -345,7 +354,7 @@ Write-Host ""
 # 是否掉线自动重登
 do {
 	try {
-		[int]$reconnect = Read-Host "是否开启掉线自动重连功能？(若需要请输入检测间隔的分钟数，一般不需要，请直接回车)"
+		[int]$reconnect = (Read-Host "是否开启掉线自动重连功能？(若需要请输入检测间隔的分钟数，一般不需要，请直接回车)") -or 0
 	} catch {
 		Write-Host "输入无效，请输入一个整数。" -ForegroundColor Red
 	}
