@@ -270,10 +270,16 @@ if ($taskExists -or $taskExists2) {
 Write-Host "接下来，请输入您的账户信息，然后按回车键" -ForegroundColor Green
 do {
 	Write-Host ""
-	$StudentID = Read-Host "请输入您的学号"
-	$securePassword = Read-Host -Prompt "请输入您的密码" -AsSecureString
+	do {
+		$StudentID = Read-Host "请输入您的学号"
+	} while (-not $StudentID)
+	do {
+		$securePassword = Read-Host -Prompt "请输入您的密码" -AsSecureString
+	} while (-not $securePassword)
 	$Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword))
-	$Carrier = Read-Host "请输入您的运营商（0.校园网 留空；1.移动 cmcc；2.联通 unicom；3.电信 telecom）"
+	do {
+		$Carrier = Read-Host "请输入您的运营商（0.校园网 留空；1.移动 cmcc；2.联通 unicom；3.电信 telecom；可输序号）"
+	} while (-not $Carrier)
 	switch ($Carrier) {
 		"0" {
 			$Carrier = ""
@@ -354,11 +360,18 @@ Write-Host ""
 # 是否掉线自动重登
 do {
 	try {
-		[int]$reconnect = (Read-Host "是否开启掉线自动重连功能？(若需要请输入检测间隔的分钟数，一般不需要，请直接回车)") -or 0
+		$reconnect = Read-Host "是否开启掉线自动重连功能？(若需要请输入检测间隔的分钟数，一般不需要，请直接回车)"
+		if ($reconnect -eq '') {
+			$reconnect = 0
+		}
+		else {
+			[int]$reconnect = $reconnect
+		}
+		$flag = $true
 	} catch {
 		Write-Host "输入无效，请输入一个整数。" -ForegroundColor Red
 	}
-} while (-not $reconnect)
+} while (-not $flag)
 
 Write-Host "正在设置自动登录..." -ForegroundColor Green
 
@@ -468,6 +481,7 @@ if ($reconnect) {
 Write-Host @"
 
 √ 设置完成！若未出现红色错误提示，则您的自动登录功能已经生效。
+√ 您目前已登录到校园网，并且以后连接校园网时会自动登录，您现在可以关闭本程序。
 如需修改设置信息，只需重新运行本程序。
 
 "@ -ForegroundColor Green
