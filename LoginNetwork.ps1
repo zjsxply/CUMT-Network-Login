@@ -215,7 +215,7 @@ Write-Host @"
 √ 电脑解锁时自动登录
 √ 连接 CUMT_Stu 或 CUMT_Tec WiFi 时自动登录
 √ 连接 CUMT_Stu 网线 (以太网) 时自动登录
-√ 每天 7:22 AM 自动登录
+√ 每天上午 7:22 - 7:25 自动登录
 √ (可选) 掉线时自动重新登录 (自定义循环检测周期)
 多种方式保证您的轻快上网体验！
 版本：v20230402
@@ -318,7 +318,7 @@ do {
 			$Carrier = "unicom"
 		}
 		default {
-			Write-Host "未知的运营商" -ForegroundColor Red
+			Write-Host "警告：未知的运营商，可能导致登录失败" -ForegroundColor Red
 		}
 	}
 
@@ -360,7 +360,7 @@ Write-Host ""
 # 是否掉线自动重登
 do {
 	try {
-		$reconnect = Read-Host "是否开启掉线自动重连功能？(若需要请输入检测间隔的分钟数，一般不需要，请直接回车)"
+		$reconnect = Read-Host "是否开启掉线自动重连功能？(若需要请输入检测间隔的分钟数，一般不需要，可直接回车)"
 		if ($reconnect -eq '') {
 			$reconnect = 0
 		}
@@ -373,7 +373,7 @@ do {
 	}
 } while (-not $flag)
 
-Write-Host "正在设置自动登录..." -ForegroundColor Green
+Write-Host "正在设置解锁电脑自动登录..." -ForegroundColor Green
 
 # 保存当前脚本的完整路径
 $scriptPath = $MyInvocation.MyCommand.Path
@@ -480,9 +480,10 @@ if ($reconnect) {
 # 输出设置成功信息
 Write-Host @"
 
-√ 设置完成！若未出现红色错误提示，则您的自动登录功能已经生效。
-√ 您目前已登录到校园网，并且以后连接校园网时会自动登录，您现在可以关闭本程序。
+√ 设置完成！若未出现红字错误提示，则您的自动登录功能已经生效。
+√ 您的电脑在以后连接校园网时会自动登录，您现在可以关闭本程序。
 如需修改设置信息，只需重新运行本程序。
+若出现红字报错，请尝试重新运行本程序。
 
 "@ -ForegroundColor Green
 

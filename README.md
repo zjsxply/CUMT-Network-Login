@@ -22,3 +22,7 @@
 只需下载 `CUMT自动登录校园网 for Windows.bat` 即可。
 
 ![screenshot](https://github.com/zjsxply/CUMT-Network-Login/blob/main/screenshot.png?raw=true)
+
+## 想做但没实现的功能
+
+弹出 Windows 气泡提示：计划任务只能用 SYSTEM 用户，否则每次执行登录会闪一下蓝色窗口；但 SYSTEM 下执行 `New-BurntToastNotification -Text "已尝试登录校园网", $notification` 不会在当前用户下弹出
