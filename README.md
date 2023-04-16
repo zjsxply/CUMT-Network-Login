@@ -1,25 +1,27 @@
 # CUMT-Network-Login
-这是一个可以设置 CUMT 校园网自动登录的程序，支持以下功能：
+这是一个可以设置 CUMT 校园网自动登录的程序。运用多种触发器，支持以下功能：
 
-- 电脑解锁时自动登录
 - 连接 `CUMT_Stu` 或 `CUMT_Tec` WiFi 时自动登录
 - 连接 `CUMT_Stu` 网线 (以太网) 时自动登录
-- 每天 7:22 AM 自动登录
-- (可选) 掉线时自动重新登录 (自定义循环检测周期)
+- 解锁进入电脑时自动登录
+- 每天上午 7:22 - 7:25 自动登录
+- (可选) 循环检测，掉线自动重登
 
 多种方式保证您的轻快上网体验！
 
+版本：v20230416
+
 ## 使用方式
 
-双击运行`CUMT自动登录校园网 for Windows.bat`，需授予管理员权限
+双击运行`CUMT校园网全自动登录 for Windows.bat`，需授予管理员权限
 
 ## 内容说明
 
 本程序使用 Powershell 编写，主程序在 `LoginNetwork.ps1` 中。
 
-我们将该 Powershell 脚本内嵌在 `CUMT自动登录校园网 for Windows.bat` 中，方便用户使用。
+我们将该 Powershell 脚本内嵌在 `CUMT校园网全自动登录 for Windows.bat` 中，方便用户使用。
 
-只需下载 `CUMT自动登录校园网 for Windows.bat` 即可。
+只需下载 `CUMT校园网全自动登录 for Windows.bat` 即可。
 
 ![screenshot](https://github.com/zjsxply/CUMT-Network-Login/blob/main/screenshot.png?raw=true)
 
