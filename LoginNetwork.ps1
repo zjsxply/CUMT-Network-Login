@@ -14,18 +14,16 @@ function Login-CampusNetwork {
 			$pingResultText = "网络处于连通状态"
 		}
 		else {
-			$pingResultText = "网络未连通，掉线；执行登录: "
+			$pingResultText = "网络未连通，可能掉线或刚连接网络；执行登录: "
 		}
 	}
 	
 	# 测试则一定发送登录请求
     if ($Test -or -not $pingResult) {
         if ([bool]$Carrier) {
-			$url = "http://10.2.5.251:801/eportal/?c=Portal&a=login&login_method=1&user_account=$($StudentID)@$($Carrier)&user_password=$($Password)"
+			$Carrier = "@$($Carrier)"
         }
-		else {
-			$url = "http://10.2.5.251:801/eportal/?c=Portal&a=login&login_method=1&user_account=$($StudentID)&user_password=$($Password)"
-		}
+		$url = "http://10.2.5.251:801/eportal/?c=Portal&a=login&login_method=1&user_account=$($StudentID)$($Carrier)&user_password=$($Password)"
 		$response = Invoke-WebRequest -Uri $url
 		$respText = $response.Content.TrimStart('(').TrimEnd(')')
 		$respJson = ConvertFrom-Json $respText
@@ -37,15 +35,36 @@ function Login-CampusNetwork {
             0 {
 				switch ($respJson.ret_code) {
 					1 {
-						switch ($respJson.msg) {
-							"bGRhcCBhdXRoIGVycm9y" {
-								$notification = "账号、密码或运营商错误"
-							}
-							"UmFkOlVzZXJOYW1lX0Vycg==" {
+						$bytes = [System.Convert]::FromBase64String($respJson.msg)
+						$msg = [System.Text.Encoding]::UTF8.GetString($bytes)
+						switch ($msg) {
+							"userid error1" {
 								$notification = "账号不存在"
 							}
-							"TWFjLCBJUCwgTkFTaXAsIFBPUlQgZXJyKDIpIQ==" {
-								$notification = "您的账号不允许在此网络使用"
+							"auth error80" {
+								$notification = "本时段禁止上网"
+							}
+							"Rad:UserName_Err" {
+								$notification = "绑定的运营商账号错误，请联系运营商核实或去运营商校园营业厅进行绑定。"
+							}
+							"Authentication Fail ErrCode=16" {
+								$notification = "本时段不允许上网"
+							}
+							"Mac, IP, NASip, PORT err(2)!" {
+								$notification = "您的账号不允许在此网络使用，请检查接入的是 CUMT_Stu 还是 CUMT_Tec 网络"
+							}
+							"Rad:Status_Err" {
+								$notification = "您绑定的运营商账号状态异常，请联系对应运营商处理。"
+							}
+							"Rad:Limit Users Err" {
+								$notification = "您的登陆超限，请在自服务 http://202.119.196.6:8080/Self 下线终端。"
+							}
+							"ldap auth error" {
+								$notification = "统一身份认证用户名密码错误！"
+							}
+							default {
+								$notification = "未知错误：$($msg)"
+								
 							}
 						}
 					}
@@ -58,7 +77,7 @@ function Login-CampusNetwork {
 				}
             }
             default {
-                $notification = "未知结果"
+                $notification = "未知结果：$($respJson)"
 				
             }
         }
@@ -166,12 +185,12 @@ if ($args) {
 		$isBefore23_50 = $currentDate.Hour -lt 23 -or ($currentDate.Hour -eq 23 -and $currentDate.Minute -le 50)
 		if (-not ($isAfter7_05 -and $isBefore23_50)){
 			$result = "不在 7:05-23:50 之间, 以 1/20 概率触发登录校园网; "
-			if (Get-Random -Maximum 20 -Minimum 1 -IncludeMinimum) {
-				$result += "触发执行，结果: "
-				$result += Login-CampusNetwork -StudentID $args[0] -Password $args[1] -Carrier $args[2]
+			if (Get-Random -Maximum 20) {
+				$result += "未触发执行"
 			}
 			else {
-				$result += "未触发执行"
+				$result += "触发执行，结果: "
+				$result += Login-CampusNetwork -StudentID $args[0] -Password $args[1] -Carrier $args[2]
 			}
 		}
 		else {
@@ -211,14 +230,14 @@ Write-Host @"
 
 # 脚本介绍
 Write-Host @"
-这是一个可以设置 CUMT 校园网自动登录的程序，支持以下功能：
-√ 电脑解锁时自动登录
+这是一个可以设置 CUMT 校园网自动登录的程序。运用多种触发器，支持以下功能：
 √ 连接 CUMT_Stu 或 CUMT_Tec WiFi 时自动登录
 √ 连接 CUMT_Stu 网线 (以太网) 时自动登录
+√ 解锁进入电脑时自动登录
 √ 每天上午 7:22 - 7:25 自动登录
-√ (可选) 掉线时自动重新登录 (自定义循环检测周期)
+√ (可选) 循环检测，掉线自动重登
 多种方式保证您的轻快上网体验！
-版本：v20230402
+版本：v20230416
 
 "@ -ForegroundColor Cyan
 
@@ -240,6 +259,7 @@ if ($taskExists -or $taskExists2) {
 	Write-Host "系统检测到已设置过自动登录。" -ForegroundColor Yellow
 	
 	$logContent = Get-Content (Get-FileLog-Path)
+	Write-Host ""
 	Write-Host "最近的执行日志如下："
 	Write-Host ((Cut-FileLog $logContent @('Monitor', 'Trigger') 5) -join "`n")
 	Write-Host ""
@@ -256,7 +276,7 @@ if ($taskExists -or $taskExists2) {
 	}
 	
 	if ($response -imatch "^[yY]$") {
-		Write-Host "已移除校园网自动登录功能，期待您再次使用！" -ForegroundColor Green
+		Write-Host "已移除校园网自动登录功能，欢迎您下次使用！" -ForegroundColor Green
 		Write-Host "按任意键退出..."
 		$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") > $null
 		Exit
@@ -278,7 +298,7 @@ do {
 	} while (-not $securePassword)
 	$Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword))
 	do {
-		$Carrier = Read-Host "请输入您的运营商（0.校园网 留空；1.移动 cmcc；2.联通 unicom；3.电信 telecom；可输序号）"
+		$Carrier = Read-Host "请输入您的运营商（请输序号：1.移动 2.联通 3.电信 0.校园网 / Tec 账号）"
 	} while (-not $Carrier)
 	switch ($Carrier) {
 		"0" {
@@ -297,6 +317,9 @@ do {
 			$Carrier = ""
 		}
 		"校园" {
+			$Carrier = ""
+		}
+		"" {
 			$Carrier = ""
 		}
 		"移动" {
@@ -318,19 +341,20 @@ do {
 			$Carrier = "unicom"
 		}
 		default {
-			Write-Host "警告：未知的运营商，可能导致登录失败" -ForegroundColor Red
+			Write-Host "警告：未知的运营商，可能导致登录失败" -ForegroundColor Yellow
 		}
 	}
 
 	do {
 		Write-Host ""
+		Write-Host "请确保您现在已连接校园网。" -NoNewline -ForegroundColor Green
 		Write-Host "正在尝试登录...  " -NoNewline -ForegroundColor Green
 		$result = Login-CampusNetwork -StudentID $StudentID -Password $Password -Carrier $Carrier -Test $true
 		Write-Host "登录结果：$result"
 		if ($result -eq "您已经处于登录状态") {
 			Write-Host "登录状态下无法验证你的账户信息。" -ForegroundColor Yellow
 			do {
-				$response = Read-Host "是否先注销登录，再重新登录以验证信息是否正确？(Y / N, 建议验证，默认 Y）"
+				$response = Read-Host "是否先注销登录，再重新登录以验证信息是否正确？(Y / N, 建议验证以免自动登录执行失败，默认 Y）"
 			} while ($response -notmatch "^[ynYN]$" -and $response -ne '')
 
 			if ($response -imatch "^[yY]$" -or $response -eq '') {
@@ -347,20 +371,33 @@ do {
 			$flag2 = $false
 			$flag = $false
 		}
-		else {
+		elseif ($result -eq "统一身份认证用户名密码错误！") {
 			Write-Host ""
 			$flag2 = $false
 			$flag = $true
+		}
+		else {
+			do {
+				$response = Read-Host "请选择是否重新填写信息，再次尝试登录以验证信息是否正确？(Y / N, 建议验证以免自动登录执行失败，默认 Y）"
+			} while ($response -notmatch "^[ynYN]$" -and $response -ne '')
+
+			if ($response -imatch "^[yY]$" -or $response -eq '') {
+				$flag2 = $false
+				$flag = $true
+			} else {
+				$flag2 = $false
+				$flag = $false
+			}
 		}
 	} while ($flag2)
 } while ($flag)
 
 Write-Host ""
 
-# 是否掉线自动重登
+# 掉线自动重登
 do {
 	try {
-		$reconnect = Read-Host "是否开启掉线自动重连功能？(若需要请输入检测间隔的分钟数，一般不需要，可直接回车)"
+		$reconnect = Read-Host "是否开启循环检测，掉线自动重登？(若需要请输入循环检测间隔分钟数；一般不需要，直接回车)"
 		if ($reconnect -eq '') {
 			$reconnect = 0
 		}
@@ -373,7 +410,7 @@ do {
 	}
 } while (-not $flag)
 
-Write-Host "正在设置解锁电脑自动登录..." -ForegroundColor Green
+Write-Host "正在设置解锁电脑和每天上午 7:22 - 7:25 时自动登录..." -ForegroundColor Green
 
 # 保存当前脚本的完整路径
 $scriptPath = $MyInvocation.MyCommand.Path
@@ -481,7 +518,9 @@ if ($reconnect) {
 Write-Host @"
 
 √ 设置完成！若未出现红字错误提示，则您的自动登录功能已经生效。
-√ 您的电脑在以后连接校园网时会自动登录，您现在可以关闭本程序。
+√ 您的电脑以后连接校园网时将自动登录，无需您再打开本程序。您现在可以关闭本程序。
+由于本程序会全自动登录，如您遇到登录设备超限等情况需要注销时，
+请手动打开 10.2.5.251（登录页面），或登录自服务系统 202.119.196.6:8080/Self 进行操作。
 如需修改设置信息，只需重新运行本程序。
 若出现红字报错，请尝试重新运行本程序。
 
@@ -491,17 +530,15 @@ Write-Host @"
 Write-Host @"
 本项目链接：https://github.com/zjsxply/CUMT-Network-Login
 本项目历时约 12 小时上线，期间得到了 GPT-4 的大量帮助！
-如有兴趣，欢迎加入：矿大 ChatGPT 交流群 646745808
+如对 GPT 有兴趣，欢迎加入：矿大 ChatGPT 交流群 646745808
 
-各学院资源分享群：数学 454162237，化工 808727301（一群）24049485（二群）
+另附各学院民间资源分享群：数学 454162237，化工 808727301（一群） 24049485（二群）
 计算机 916483545，环测 909893238，信控 464112168，机电 717176773，电力 830604599
 
 "@ -ForegroundColor Cyan
 
 $temp = Read-Host "按回车键退出..."
-# Write-Host "按任意键退出..."
+<# Write-Host "按任意键退出..."
 
 # 等待用户按下任意键，以便在脚本执行结束后保留 PowerShell 窗口以查看输出
-# $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") > $null
-
-
+$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") > $null #>
