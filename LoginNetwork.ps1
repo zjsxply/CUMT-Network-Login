@@ -1,4 +1,77 @@
 # 定义登录函数
+function Send-Login-Request {
+    param (
+        [string]$StudentID,
+        [string]$Password,
+        [string]$Carrier
+    )
+		
+	if ([bool]$Carrier) {
+		$Carrier = "@$($Carrier)"
+	}
+	$url = "http://10.2.5.251:801/eportal/?c=Portal&a=login&login_method=1&user_account=$($StudentID)$($Carrier)&user_password=$($Password)"
+	$response = Invoke-WebRequest -Uri $url -UseBasicParsing
+	$respText = $response.Content.TrimStart('(').TrimEnd(')')
+	$respJson = ConvertFrom-Json $respText
+	
+	switch ($respJson.result) {
+		1 {
+			$notification = "登录成功"
+		}
+		0 {
+			switch ($respJson.ret_code) {
+				1 {
+					$bytes = [System.Convert]::FromBase64String($respJson.msg)
+					$msg = [System.Text.Encoding]::UTF8.GetString($bytes)
+					switch ($msg) {
+						"userid error1" {
+							$notification = "账号不存在"
+						}
+						"auth error80" {
+							$notification = "本时段禁止上网"
+						}
+						"Rad:UserName_Err" {
+							$notification = "绑定的运营商账号错误，请联系运营商核实或去运营商校园营业厅进行绑定。"
+						}
+						"Authentication Fail ErrCode=16" {
+							$notification = "本时段不允许上网"
+						}
+						"Mac, IP, NASip, PORT err(2)!" {
+							$notification = "您的账号不允许在此网络使用，请检查接入的是 CUMT_Stu 还是 CUMT_Tec 网络"
+						}
+						"Rad:Status_Err" {
+							$notification = "您绑定的运营商账号状态异常，请联系对应运营商处理。"
+						}
+						"Rad:Limit Users Err" {
+							$notification = "您的登陆超限，请在自服务 http://202.119.196.6:8080/Self 下线终端。"
+						}
+						"ldap auth error" {
+							$notification = "统一身份认证用户名密码错误！"
+						}
+						default {
+							$notification = "未知错误：$($msg)"
+							
+						}
+					}
+				}
+				2 {
+					$notification = "您已经处于登录状态"
+				}
+				3 {
+					$notification = "未知错误，错误代码：3"
+				}
+			}
+		}
+		default {
+			$notification = "未知结果：$($respJson)"
+			
+		}
+	}
+	
+	return $notification
+}
+
+# 定义登录函数
 function Login-CampusNetwork {
     param (
         [string]$StudentID,
@@ -20,70 +93,17 @@ function Login-CampusNetwork {
 	
 	# 测试则一定发送登录请求
     if ($Test -or -not $pingResult) {
-        if ([bool]$Carrier) {
-			$Carrier = "@$($Carrier)"
-        }
-		$url = "http://10.2.5.251:801/eportal/?c=Portal&a=login&login_method=1&user_account=$($StudentID)$($Carrier)&user_password=$($Password)"
-		$response = Invoke-WebRequest -Uri $url
-		$respText = $response.Content.TrimStart('(').TrimEnd(')')
-		$respJson = ConvertFrom-Json $respText
+		$pingResult = Test-Connection -ComputerName "10.2.5.251" -Quiet -BufferSize 1 -Count 1
+		if (-not $pingResult) {
+			$notification = "非校园网环境"
+		}
+		else {
+			$notification = Send-Login-Request $StudentID $Password $Carrier
+			
+			# 弹出系统通知消息
+			# New-BurntToastNotification -Text "已尝试登录校园网", $notification
+		}
 		
-        switch ($respJson.result) {
-            1 {
-                $notification = "登录成功"
-            }
-            0 {
-				switch ($respJson.ret_code) {
-					1 {
-						$bytes = [System.Convert]::FromBase64String($respJson.msg)
-						$msg = [System.Text.Encoding]::UTF8.GetString($bytes)
-						switch ($msg) {
-							"userid error1" {
-								$notification = "账号不存在"
-							}
-							"auth error80" {
-								$notification = "本时段禁止上网"
-							}
-							"Rad:UserName_Err" {
-								$notification = "绑定的运营商账号错误，请联系运营商核实或去运营商校园营业厅进行绑定。"
-							}
-							"Authentication Fail ErrCode=16" {
-								$notification = "本时段不允许上网"
-							}
-							"Mac, IP, NASip, PORT err(2)!" {
-								$notification = "您的账号不允许在此网络使用，请检查接入的是 CUMT_Stu 还是 CUMT_Tec 网络"
-							}
-							"Rad:Status_Err" {
-								$notification = "您绑定的运营商账号状态异常，请联系对应运营商处理。"
-							}
-							"Rad:Limit Users Err" {
-								$notification = "您的登陆超限，请在自服务 http://202.119.196.6:8080/Self 下线终端。"
-							}
-							"ldap auth error" {
-								$notification = "统一身份认证用户名密码错误！"
-							}
-							default {
-								$notification = "未知错误：$($msg)"
-								
-							}
-						}
-					}
-					2 {
-						$notification = "您已经处于登录状态"
-					}
-					3 {
-						$notification = "未知错误，错误代码：3"
-					}
-				}
-            }
-            default {
-                $notification = "未知结果：$($respJson)"
-				
-            }
-        }
-
-        # 弹出系统通知消息
-		# New-BurntToastNotification -Text "已尝试登录校园网", $notification
     }
 		
 	return $pingResultText + $notification
@@ -92,7 +112,7 @@ function Login-CampusNetwork {
 # 定义注销函数
 function Logout-CampusNetwork {
 	$url = "http://10.2.5.251:801/eportal/?c=Portal&a=logout"
-	$response = Invoke-WebRequest -Uri $url
+	$response = Invoke-WebRequest -Uri $url -UseBasicParsing
 }
 
 # 定义裁剪日志记录函数
@@ -237,7 +257,7 @@ Write-Host @"
 √ 每天上午 7:22 - 7:25 自动登录
 √ (可选) 循环检测，掉线自动重登
 多种方式保证您的轻快上网体验！
-版本：v20230416
+版本：v20230422
 
 "@ -ForegroundColor Cyan
 
